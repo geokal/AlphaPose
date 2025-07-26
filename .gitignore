@@ -117,4 +117,5 @@ tmp_*/
 examples/res*/
 data/
 exp/
+.DS_Store
 data
