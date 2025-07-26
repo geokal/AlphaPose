@@ -12,6 +12,9 @@ import sys
 import math
 import time
 
+# Add the project root to Python path
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 import cv2
 import numpy as np
 
@@ -65,8 +68,18 @@ parser.add_argument('--pose_track', dest='pose_track',
 args = parser.parse_args()
 cfg = update_config(args.cfg)
 
-args.gpus = [int(args.gpus[0])] if torch.cuda.device_count() >= 1 else [-1]
-args.device = torch.device("cuda:" + str(args.gpus[0]) if args.gpus[0] >= 0 else "cpu")
+# Device selection with MPS support for Apple Silicon
+if torch.cuda.is_available():
+    args.gpus = [int(args.gpus[0])] if torch.cuda.device_count() >= 1 else [-1]
+    args.device = torch.device("cuda:" + str(args.gpus[0]) if args.gpus[0] >= 0 else "cpu")
+elif torch.backends.mps.is_available():
+    args.gpus = [-1]  # MPS doesn't use GPU indices like CUDA
+    args.device = torch.device("mps")
+    print("Using Apple Silicon MPS (Metal Performance Shaders) for acceleration")
+else:
+    args.gpus = [-1]
+    args.device = torch.device("cpu")
+    print("Using CPU (no GPU acceleration available)")
 args.tracking = args.pose_track or args.pose_flow or args.detector=='tracker'
 
 class DetectionLoader():

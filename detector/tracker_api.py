@@ -57,12 +57,17 @@ class Tracker(BaseDetector):
         self.emb_dim = self.model.emb_dim
 
         if self.tracker_opt:
-            if len(self.tracker_opt.gpus) > 1:
+            if len(self.tracker_opt.gpus) > 1 and self.tracker_opt.device.type == 'cuda':
                 self.model = torch.nn.DataParallel(self.model, device_ids=self.tracker_opt.gpus).to(self.tracker_opt.device)
             else:
                 self.model.to(self.tracker_opt.device)
         else:
-            self.model.cuda()
+            if torch.cuda.is_available():
+                self.model.cuda()
+            elif torch.backends.mps.is_available():
+                self.model.to('mps')
+            else:
+                self.model.cpu()
         self.model.eval()
         print("Network successfully loaded")
 
@@ -107,7 +112,15 @@ class Tracker(BaseDetector):
 
         ''' Step 1: Network forward, get detections & embeddings'''
         with torch.no_grad():
-            imgs = imgs.to(args.device) if args else imgs.cuda()
+            if args:
+                imgs = imgs.to(args.device)
+            else:
+                if torch.cuda.is_available():
+                    imgs = imgs.cuda()
+                elif torch.backends.mps.is_available():
+                    imgs = imgs.to('mps')
+                else:
+                    imgs = imgs.cpu()
             pred = self.model(imgs)
 
         if len(pred) > 0:

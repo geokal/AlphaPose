@@ -47,14 +47,19 @@ class YOLOXDetector(BaseDetector):
         )
 
         if args:
-            if len(args.gpus) > 1:
+            if len(args.gpus) > 1 and args.device.type == 'cuda':
                 self.model = torch.nn.DataParallel(self.model, device_ids=args.gpus).to(
                     args.device
                 )
             else:
                 self.model.to(args.device)
         else:
-            self.model.cuda()
+            if torch.cuda.is_available():
+                self.model.cuda()
+            elif torch.backends.mps.is_available():
+                self.model.to('mps')
+            else:
+                self.model.cpu()
         self.model.eval()
 
     def image_preprocess(self, img_source):
@@ -88,7 +93,15 @@ class YOLOXDetector(BaseDetector):
         if not self.model:
             self.load_model()
         with torch.no_grad():
-            imgs = imgs.to(args.device) if args else imgs.cuda()
+            if args:
+                imgs = imgs.to(args.device)
+            else:
+                if torch.cuda.is_available():
+                    imgs = imgs.cuda()
+                elif torch.backends.mps.is_available():
+                    imgs = imgs.to('mps')
+                else:
+                    imgs = imgs.cpu()
             prediction = self.model(imgs)
             # do nms to the detection results, only human category is left
             dets = self.dynamic_write_results(
@@ -159,7 +172,15 @@ class YOLOXDetector(BaseDetector):
         img, orig_img, img_dim_list = prep_image(img_name, self.img_size)
         with torch.no_grad():
             img_dim_list = torch.FloatTensor([img_dim_list]).repeat(1, 2)
-            img = img.to(args.device) if args else img.cuda()
+            if args:
+                img = img.to(args.device)
+            else:
+                if torch.cuda.is_available():
+                    img = img.cuda()
+                elif torch.backends.mps.is_available():
+                    img = img.to('mps')
+                else:
+                    img = img.cpu()
             prediction = self.model(img)
             # do nms to the detection results, only human category is left
             dets = self.dynamic_write_results(

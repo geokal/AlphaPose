@@ -5,6 +5,9 @@ import platform
 import sys
 import time
 
+# Add the project root to Python path
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 import numpy as np
 import torch
 from tqdm import tqdm
@@ -92,8 +95,18 @@ cfg = update_config(args.cfg)
 if platform.system() == 'Windows':
     args.sp = True
 
-args.gpus = [int(i) for i in args.gpus.split(',')] if torch.cuda.device_count() >= 1 else [-1]
-args.device = torch.device("cuda:" + str(args.gpus[0]) if args.gpus[0] >= 0 else "cpu")
+# Device selection with MPS support for Apple Silicon
+if torch.cuda.is_available():
+    args.gpus = [int(i) for i in args.gpus.split(',')] if torch.cuda.device_count() >= 1 else [-1]
+    args.device = torch.device("cuda:" + str(args.gpus[0]) if args.gpus[0] >= 0 else "cpu")
+elif torch.backends.mps.is_available():
+    args.gpus = [-1]  # MPS doesn't use GPU indices like CUDA
+    args.device = torch.device("mps")
+    print("Using Apple Silicon MPS (Metal Performance Shaders) for acceleration")
+else:
+    args.gpus = [-1]
+    args.device = torch.device("cpu")
+    print("Using CPU (no GPU acceleration available)")
 args.detbatch = args.detbatch * len(args.gpus)
 args.posebatch = args.posebatch * len(args.gpus)
 args.tracking = args.pose_track or args.pose_flow or args.detector=='tracker'

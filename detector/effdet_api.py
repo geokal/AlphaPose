@@ -56,7 +56,7 @@ class EffDetDetector(BaseDetector):
         self.model = DetBenchEval(net, self.model_cfg, nms_thres=self.nms_thres, max_dets=self.max_dets)
 
         if args:
-            if len(args.gpus) > 1:
+            if len(args.gpus) > 1 and args.device.type == 'cuda':
                 if has_amp:
                     print('Using AMP mixed precision.')
                     self.model = amp.initialize(self.model, opt_level='O1')
@@ -72,7 +72,12 @@ class EffDetDetector(BaseDetector):
                 self.model = amp.initialize(self.model, opt_level='O1')
             else:
                 print('AMP not installed, running network in FP32.')
-            self.model.cuda()
+            if torch.cuda.is_available():
+                self.model.cuda()
+            elif torch.backends.mps.is_available():
+                self.model.to('mps')
+            else:
+                self.model.cpu()
 
         net.eval()
 
@@ -103,9 +108,23 @@ class EffDetDetector(BaseDetector):
         if not self.model:
             self.load_model()
         with torch.no_grad():
-            imgs = imgs.to(args.device) if args else imgs.cuda()
-            scaling_factors = torch.FloatTensor([1./min(self.inp_dim / orig_dim[0], self.inp_dim / orig_dim[1]) for orig_dim in orig_dim_list]).view(-1, 1)
-            scaling_factors = scaling_factors.to(args.device) if args else scaling_factors.cuda()
+            if args:
+                imgs = imgs.to(args.device)
+                scaling_factors = torch.FloatTensor([1./min(self.inp_dim / orig_dim[0], self.inp_dim / orig_dim[1]) for orig_dim in orig_dim_list]).view(-1, 1)
+                scaling_factors = scaling_factors.to(args.device)
+            else:
+                if torch.cuda.is_available():
+                    imgs = imgs.cuda()
+                    scaling_factors = torch.FloatTensor([1./min(self.inp_dim / orig_dim[0], self.inp_dim / orig_dim[1]) for orig_dim in orig_dim_list]).view(-1, 1)
+                    scaling_factors = scaling_factors.cuda()
+                elif torch.backends.mps.is_available():
+                    imgs = imgs.to('mps')
+                    scaling_factors = torch.FloatTensor([1./min(self.inp_dim / orig_dim[0], self.inp_dim / orig_dim[1]) for orig_dim in orig_dim_list]).view(-1, 1)
+                    scaling_factors = scaling_factors.to('mps')
+                else:
+                    imgs = imgs.cpu()
+                    scaling_factors = torch.FloatTensor([1./min(self.inp_dim / orig_dim[0], self.inp_dim / orig_dim[1]) for orig_dim in orig_dim_list]).view(-1, 1)
+                    scaling_factors = scaling_factors.cpu()
             prediction = self.model(imgs, scaling_factors) 
             #change the pred format to alphapose (nms has already been done in effdeteval model)
             prediction = prediction.cpu()
@@ -160,9 +179,23 @@ class EffDetDetector(BaseDetector):
         img, orig_img, img_dim_list = prep_image(img_name, self.inp_dim)
         with torch.no_grad():
             img_dim_list = torch.FloatTensor([img_dim_list]).repeat(1, 2)
-            img = img.to(args.device) if args else img.cuda()
-            scaling_factor = torch.FloatTensor([1/min(self.inp_dim / orig_dim[0], self.inp_dim / orig_dim[1]) for orig_dim in img_dim_list]).view(-1, 1)
-            scaling_factor = scaling_factor.to(args.device) if args else scaling_factor.cuda()
+            if args:
+                img = img.to(args.device)
+                scaling_factor = torch.FloatTensor([1/min(self.inp_dim / orig_dim[0], self.inp_dim / orig_dim[1]) for orig_dim in img_dim_list]).view(-1, 1)
+                scaling_factor = scaling_factor.to(args.device)
+            else:
+                if torch.cuda.is_available():
+                    img = img.cuda()
+                    scaling_factor = torch.FloatTensor([1/min(self.inp_dim / orig_dim[0], self.inp_dim / orig_dim[1]) for orig_dim in img_dim_list]).view(-1, 1)
+                    scaling_factor = scaling_factor.cuda()
+                elif torch.backends.mps.is_available():
+                    img = img.to('mps')
+                    scaling_factor = torch.FloatTensor([1/min(self.inp_dim / orig_dim[0], self.inp_dim / orig_dim[1]) for orig_dim in img_dim_list]).view(-1, 1)
+                    scaling_factor = scaling_factor.to('mps')
+                else:
+                    img = img.cpu()
+                    scaling_factor = torch.FloatTensor([1/min(self.inp_dim / orig_dim[0], self.inp_dim / orig_dim[1]) for orig_dim in img_dim_list]).view(-1, 1)
+                    scaling_factor = scaling_factor.cpu()
             prediction = self.model(img, scaling_factor) 
             #change the pred format to alphapose (nms has already been done in effdeteval model)
             prediction = prediction.cpu()

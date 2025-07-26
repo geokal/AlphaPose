@@ -3,7 +3,12 @@ from torch.autograd import Function
 from torch.autograd.function import once_differentiable
 from torch.nn.modules.utils import _pair
 
-from . import roi_align_cuda
+try:
+    from . import roi_align_cuda
+    ROI_ALIGN_CUDA_AVAILABLE = True
+except ImportError:
+    ROI_ALIGN_CUDA_AVAILABLE = False
+    print("Warning: roi_align_cuda not available, using torchvision fallback")
 
 
 class RoIAlignFunction(Function):
@@ -62,13 +67,17 @@ class RoIAlign(nn.Module):
                  out_size,
                  spatial_scale=1,
                  sample_num=0,
-                 use_torchvision=False):
+                 use_torchvision=None):
         super(RoIAlign, self).__init__()
 
         self.out_size = out_size
         self.spatial_scale = float(spatial_scale)
         self.sample_num = int(sample_num)
-        self.use_torchvision = use_torchvision
+        # Use torchvision if CUDA module is not available or explicitly requested
+        if use_torchvision is None:
+            self.use_torchvision = not ROI_ALIGN_CUDA_AVAILABLE
+        else:
+            self.use_torchvision = use_torchvision
 
     def forward(self, features, rois):
         if self.use_torchvision:

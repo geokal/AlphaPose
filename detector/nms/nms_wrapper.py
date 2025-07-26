@@ -1,7 +1,21 @@
 import numpy as np
 import torch
 
-from . import nms_cpu, nms_cuda
+# Import nms_cpu only if available (disabled due to PyTorch 2.0.1 compatibility issues)
+try:
+    from . import nms_cpu
+    NMS_CPU_AVAILABLE = True
+except ImportError:
+    NMS_CPU_AVAILABLE = False
+    print("Warning: nms_cpu extension not available due to PyTorch compatibility issues")
+
+try:
+    from . import nms_cuda
+    NMS_CUDA_AVAILABLE = True
+except ImportError:
+    NMS_CUDA_AVAILABLE = False
+    print("Warning: nms_cuda extension not available")
+
 from .soft_nms_cpu import soft_nms_cpu
 
 
@@ -40,9 +54,16 @@ def nms(dets, iou_thr, device_id=None):
         inds = dets_th.new_zeros(0, dtype=torch.long)
     else:
         if dets_th.is_cuda:
-            inds = nms_cuda.nms(dets_th, iou_thr)
+            if NMS_CUDA_AVAILABLE:
+                inds = nms_cuda.nms(dets_th, iou_thr)
+            else:
+                raise RuntimeError("CUDA NMS not available")
         else:
-            inds = nms_cpu.nms(dets_th, iou_thr)
+            if NMS_CPU_AVAILABLE:
+                inds = nms_cpu.nms(dets_th, iou_thr)
+            else:
+                # Fallback to a simple Python implementation
+                raise RuntimeError("CPU NMS not available - please use soft_nms instead")
 
     if is_numpy:
         inds = inds.cpu().numpy()

@@ -4,9 +4,10 @@ import subprocess
 import time
 
 import numpy as np
+import torch
 from Cython.Build import cythonize
 from setuptools import Extension, find_packages, setup
-from torch.utils.cpp_extension import BuildExtension, CUDAExtension
+from torch.utils.cpp_extension import BuildExtension
 
 MAJOR = 0
 MINOR = 5
@@ -16,23 +17,18 @@ SHORT_VERSION = '{}.{}.{}{}'.format(MAJOR, MINOR, PATCH, SUFFIX)
 
 version_file = 'alphapose/version.py'
 
-
 def readme():
     with open('README.md') as f:
         content = f.read()
     return content
 
-
 def get_git_hash():
-
     def _minimal_ext_cmd(cmd):
-        # construct minimal environment
         env = {}
         for k in ['SYSTEMROOT', 'PATH', 'HOME']:
             v = os.environ.get(k)
             if v is not None:
                 env[k] = v
-        # LANGUAGE is used on win32
         env['LANGUAGE'] = 'C'
         env['LANG'] = 'C'
         env['LC_ALL'] = 'C'
@@ -48,7 +44,6 @@ def get_git_hash():
 
     return sha
 
-
 def get_hash():
     if os.path.exists('.git'):
         sha = get_git_hash()[:7]
@@ -63,7 +58,6 @@ def get_hash():
 
     return sha
 
-
 def write_version_py():
     content = """# GENERATED VERSION FILE
 # TIME: {}
@@ -77,110 +71,64 @@ short_version = '{}'
     with open(version_file, 'w') as f:
         f.write(content.format(time.asctime(), VERSION, SHORT_VERSION))
 
-
 def get_version():
     with open(version_file, 'r') as f:
         exec(compile(f.read(), version_file, 'exec'))
     return locals()['__version__']
 
-
 def make_cython_ext(name, module, sources):
     extra_compile_args = None
     if platform.system() != 'Windows':
         extra_compile_args = {
-            'cxx': ['-Wno-unused-function', '-Wno-write-strings']
+            'cxx': ['-Wno-unused-function', '-Wno-write-strings', '-DNPY_NO_DEPRECATED_API=NPY_1_7_API_VERSION']
         }
 
+    # Hardcode the correct PyTorch include path
+    #torch_include = '/Users/georgek/.local/share/virtualenvs/AlphaPose-kzn0QKfJ/lib/python3.9/site-packages/torch/include'
+    torch_include = os.path.join(os.path.dirname(torch.__file__), 'include')
+    
     extension = Extension(
         '{}.{}'.format(module, name),
         [os.path.join(*module.split('.'), p) for p in sources],
-        include_dirs=[np.get_include()],
+        include_dirs=[np.get_include(), torch_include],
         language='c++',
         extra_compile_args=extra_compile_args)
     extension, = cythonize(extension)
     return extension
 
-
-def make_cuda_ext(name, module, sources):
-
-    return CUDAExtension(
-        name='{}.{}'.format(module, name),
-        sources=[os.path.join(*module.split('.'), p) for p in sources],
-        extra_compile_args={
-            'cxx': [],
-            'nvcc': [
-                '-D__CUDA_NO_HALF_OPERATORS__',
-                '-D__CUDA_NO_HALF_CONVERSIONS__',
-                '-D__CUDA_NO_HALF2_OPERATORS__',
-            ]
-        })
-
-
 def get_ext_modules():
-    ext_modules = []
-    # only windows visual studio 2013+ support compile c/cuda extensions
-    # If you force to compile extension on Windows and ensure appropriate visual studio
-    # is intalled, you can try to use these ext_modules.
-    force_compile = False
-    if platform.system() != 'Windows' or force_compile:
-        ext_modules = [
-            make_cython_ext(
-                name='soft_nms_cpu',
-                module='detector.nms',
-                sources=['src/soft_nms_cpu.pyx']),
-            make_cuda_ext(
-                name='nms_cpu',
-                module='detector.nms',
-                sources=['src/nms_cpu.cpp']),
-            make_cuda_ext(
-                name='nms_cuda',
-                module='detector.nms',
-                sources=['src/nms_cuda.cpp', 'src/nms_kernel.cu']),
-            make_cuda_ext(
-                name='roi_align_cuda',
-                module='alphapose.utils.roi_align',
-                sources=['src/roi_align_cuda.cpp', 'src/roi_align_kernel.cu']),
-            make_cuda_ext(
-                name='deform_conv_cuda',
-                module='alphapose.models.layers.dcn',
-                sources=[
-                    'src/deform_conv_cuda.cpp',
-                    'src/deform_conv_cuda_kernel.cu'
-                ]),
-            make_cuda_ext(
-                name='deform_pool_cuda',
-                module='alphapose.models.layers.dcn',
-                sources=[
-                    'src/deform_pool_cuda.cpp',
-                    'src/deform_pool_cuda_kernel.cu'
-                ]),
-        ]
+    ext_modules = [
+        make_cython_ext(
+            name='soft_nms_cpu',
+            module='detector.nms',
+            sources=['src/soft_nms_cpu.pyx']),
+        # The nms_cpu.cpp extension has compatibility issues with PyTorch 2.0.1
+        # make_cython_ext(
+        #     name='nms_cpu',
+        #     module='detector.nms',
+        #     sources=['src/nms_cpu.cpp']),
+    ]
     return ext_modules
-
 
 def get_install_requires():
     install_requires = [
-        'six', 'terminaltables', 'scipy',
-        'opencv-python', 'matplotlib', 'visdom',
-        'tqdm', 'tensorboardx', 'easydict',
-        'pyyaml', 'halpecocotools',
-        'torch>=1.1.0', 'torchvision>=0.3.0',
-        'munkres', 'timm==0.1.20', 'natsort'
+        'six', 'terminaltables', 'scipy>=1.9.3',
+        'opencv-python>=4.8.0', 'matplotlib>=3.7.2', 'visdom',
+        'tqdm>=4.66.1', 'tensorboardx', 'easydict',
+        'pyyaml>=6.0', 'halpecocotools',
+        'torch>=2.0.0', 'torchvision>=0.15.0', 'torchaudio>=2.0.0',
+        'munkres>=1.1.4', 'timm==0.1.20', 'natsort'
     ]
-    # official pycocotools doesn't support Windows, we will install it by third-party git repository later
     if platform.system() != 'Windows':
-        install_requires.append('pycocotools')
+        install_requires.append('pycocotools>=2.0.7')
     return install_requires
 
-
 def is_installed(package_name):
-    #from pip._internal.utils.misc import get_installed_distributions
     import pkg_resources
     for p in pkg_resources.working_set:
         if package_name in p.egg_name():
             return True
     return False
-
 
 if __name__ == '__main__':
     write_version_py()
@@ -197,22 +145,20 @@ if __name__ == '__main__':
             'Development Status :: 4 - Beta',
             'License :: OSI Approved :: Apache Software License',
             'Operating System :: OS Independent',
-            'Programming Language :: Python :: 2',
-            'Programming Language :: Python :: 2.7',
             'Programming Language :: Python :: 3',
-            'Programming Language :: Python :: 3.4',
-            'Programming Language :: Python :: 3.5',
             'Programming Language :: Python :: 3.6',
+            'Programming Language :: Python :: 3.7',
+            'Programming Language :: Python :: 3.8',
+            'Programming Language :: Python :: 3.9',
         ],
         license='GPLv3',
-        python_requires=">=3",
-        setup_requires=['pytest-runner', 'numpy', 'cython'],
+        python_requires=">=3.6",
+        setup_requires=['pytest-runner', 'numpy>=1.23.5', 'cython>=0.29.32'],
         tests_require=['pytest'],
         install_requires=get_install_requires(),
         ext_modules=get_ext_modules(),
         cmdclass={'build_ext': BuildExtension},
         zip_safe=False)
-    # Windows need pycocotools here: https://github.com/philferriere/cocoapi#subdirectory=PythonAPI
     if platform.system() == 'Windows' and not is_installed('pycocotools'):
         print("\nInstall third-party pycocotools for Windows...")
         cmd = 'python -m pip install git+https://github.com/philferriere/cocoapi.git#subdirectory=PythonAPI'

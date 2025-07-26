@@ -51,12 +51,17 @@ class YOLODetector(BaseDetector):
         
 
         if args:
-            if len(args.gpus) > 1:
+            if len(args.gpus) > 1 and args.device.type == 'cuda':
                 self.model = torch.nn.DataParallel(self.model, device_ids=args.gpus).to(args.device)
             else:
                 self.model.to(args.device)
         else:
-            self.model.cuda()
+            if torch.cuda.is_available():
+                self.model.cuda()
+            elif torch.backends.mps.is_available():
+                self.model.to('mps')
+            else:
+                self.model.cpu()
         self.model.eval()
 
     def image_preprocess(self, img_source):
@@ -90,8 +95,16 @@ class YOLODetector(BaseDetector):
         if not self.model:
             self.load_model()
         with torch.no_grad():
-            imgs = imgs.to(args.device) if args else imgs.cuda()
-            prediction = self.model(imgs, args=args) 
+            if args:
+                imgs = imgs.to(args.device)
+            else:
+                if torch.cuda.is_available():
+                    imgs = imgs.cuda()
+                elif torch.backends.mps.is_available():
+                    imgs = imgs.to('mps')
+                else:
+                    imgs = imgs.cpu()
+            prediction = self.model(imgs, args=args)
             #do nms to the detection results, only human category is left
             dets = self.dynamic_write_results(prediction, self.confidence, 
                                               self.num_classes, nms=True, 
