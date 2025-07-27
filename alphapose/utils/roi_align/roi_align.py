@@ -80,7 +80,7 @@ class RoIAlign(nn.Module):
             self.use_torchvision = use_torchvision
 
     def forward(self, features, rois):
-        if self.use_torchvision:
+        if self.use_torchvision or features.device.type == 'mps':
             from torchvision.ops import roi_align as tv_roi_align
             return tv_roi_align(features, rois, _pair(self.out_size),
                                 self.spatial_scale, self.sample_num)

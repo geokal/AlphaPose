@@ -1,0 +1,27 @@
+[[source]]
+url = "https://pypi.org/simple"
+verify_ssl = true
+name = "pypi"
+
+[packages]
+numpy = ">=1.23.5"
+scipy = ">=1.9.3"
+opencv-python = ">=4.8.0"
+matplotlib = ">=3.7.2"
+tqdm = ">=4.66.1"
+pillow = ">=9.5.0"
+munkres = ">=1.1.4"
+pyyaml = ">=6.0"
+cython = ">=0.29.32"
+pycocotools = ">=2.0.7"
+ninja = "*"
+torch = "==2.0.1"
+torchvision = "==0.15.2"
+torchaudio = "==2.0.2"
+pandas = "*"
+
+[dev-packages]
+
+[requires]
+python_version = "3.9"
+python_full_version = "3.9.18"

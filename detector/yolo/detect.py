@@ -3,6 +3,7 @@ import time
 import torch 
 import torch.nn as nn
 from torch.autograd import Variable
+from torch.backends import mps
 import numpy as np
 import cv2 
 from util import *
@@ -25,7 +26,10 @@ if __name__ == '__main__':
     confidence = 0.5
     nms_thesh = 0.4
 
-    CUDA = torch.cuda.is_available()
+    if torch.backends.mps.is_available():
+        CUDA = False
+    else:
+        CUDA = torch.cuda.is_available()
 
     num_classes = 80
     classes = load_classes('data/coco.names') 
@@ -43,7 +47,7 @@ if __name__ == '__main__':
 
     #If there's a GPU availible, put the model on GPU
     if CUDA:
-        model.cuda()
+        model.to('mps' if torch.backends.mps.is_available() else 'cuda')
 
     #Set the model in evaluation mode
     model.eval()
@@ -69,7 +73,10 @@ if __name__ == '__main__':
     for batch in im_batches:
         #load the image
         if CUDA:
-            batch = batch.cuda()
+            if torch.backends.mps.is_available():
+                batch = batch.to('mps')
+            else:
+                batch = batch.to('cuda')
         with torch.no_grad():
             prediction = model(Variable(batch), CUDA)
 
@@ -77,7 +84,10 @@ if __name__ == '__main__':
         output = prediction
 
         if CUDA:
-            torch.cuda.synchronize()
+            if torch.backends.mps.is_available():
+                torch.mps.synchronize()
+            else:
+                torch.cuda.synchronize()
 
     try:
         output

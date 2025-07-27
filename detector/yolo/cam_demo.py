@@ -79,7 +79,10 @@ if __name__ == '__main__':
     confidence = float(args.confidence)
     nms_thesh = float(args.nms_thresh)
     start = 0
-    CUDA = torch.cuda.is_available()
+    if torch.backends.mps.is_available():
+        CUDA = False
+    else:
+        CUDA = torch.cuda.is_available()
     
 
     
@@ -96,9 +99,11 @@ if __name__ == '__main__':
     assert inp_dim % 32 == 0 
     assert inp_dim > 32
 
-    if CUDA:
-        model.cuda()
-            
+    if torch.backends.mps.is_available():
+        model.to('mps')
+    elif torch.cuda.is_available():
+        model.to('cuda')
+    
     model.eval()
     
     videofile = 'video.avi'
@@ -119,7 +124,10 @@ if __name__ == '__main__':
 #            im_dim = torch.FloatTensor(dim).repeat(1,2)                        
             
             
-            if CUDA:
+            if torch.backends.mps.is_available():
+                im_dim = im_dim.to('mps')
+                img = img.to('mps')
+            elif torch.cuda.is_available():
                 im_dim = im_dim.cuda()
                 img = img.cuda()
             
@@ -161,8 +169,3 @@ if __name__ == '__main__':
             
         else:
             break
-    
-
-    
-    
-

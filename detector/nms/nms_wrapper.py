@@ -53,17 +53,16 @@ def nms(dets, iou_thr, device_id=None):
     if dets_th.shape[0] == 0:
         inds = dets_th.new_zeros(0, dtype=torch.long)
     else:
-        if dets_th.is_cuda:
+        if dets_th.device.type == 'mps' or dets_th.device.type == 'cpu':
+            # Force soft-NMS on Apple Silicon (MPS) and CPU
+            return soft_nms(dets, iou_thr)
+        elif dets_th.is_cuda:
             if NMS_CUDA_AVAILABLE:
                 inds = nms_cuda.nms(dets_th, iou_thr)
             else:
                 raise RuntimeError("CUDA NMS not available")
         else:
-            if NMS_CPU_AVAILABLE:
-                inds = nms_cpu.nms(dets_th, iou_thr)
-            else:
-                # Fallback to a simple Python implementation
-                raise RuntimeError("CPU NMS not available - please use soft_nms instead")
+            raise RuntimeError("Unsupported device type for NMS")
 
     if is_numpy:
         inds = inds.cpu().numpy()
