@@ -13,11 +13,13 @@
         "extra_compile_args": {
             "cxx": [
                 "-Wno-unused-function",
-                "-Wno-write-strings"
+                "-Wno-write-strings",
+                "-DNPY_NO_DEPRECATED_API=NPY_1_7_API_VERSION"
             ]
         },
         "include_dirs": [
-            "/Users/georgek/.local/share/virtualenvs/AlphaPose-kzn0QKfJ/lib/python3.9/site-packages/numpy/_core/include"
+            "/Users/georgek/.local/share/virtualenvs/AlphaPose-kzn0QKfJ/lib/python3.9/site-packages/numpy/_core/include",
+            "/Users/georgek/.local/share/virtualenvs/AlphaPose-kzn0QKfJ/lib/python3.9/site-packages/torch/include"
         ],
         "language": "c++",
         "name": "detector.nms.soft_nms_cpu",

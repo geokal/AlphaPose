@@ -129,6 +129,10 @@ Train `FastPose` on mscoco dataset.
 ``` bash
 ./scripts/train.sh ./configs/coco/resnet/256x192_res50_lr1e-3_1x.yaml exp_fastpose
 ```
+Demo using `FastPose` model leveraging Apple Silicon chips (m1+) 
+```bash
+un python scripts/demo_inference.py --cfg configs/coco/resnet/256x192_res50_lr1e-3_1x.yaml --checkpoint pretrained_models/fast_res50_256x192.pth --video /Users/georgek/Downloads/video_resized.mp4 --sp --device mps --detector yolo --outdir examples/res/ --save_video --vis_fast --debug --profile
+```
 
 More detailed inference options and examples, please refer to [GETTING_STARTED.md](docs/GETTING_STARTED.md)
 
