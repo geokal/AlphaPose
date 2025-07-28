@@ -143,7 +143,7 @@ class YOLODetector(BaseDetector):
         prediction = prediction * conf_mask
 
         try:
-            ind_nz = torch.nonzero(prediction[:,:,4]).transpose(0,1).contiguous()
+            ind_nz = torch.where(prediction[:, :, 4] > 0)[0]
         except:
             return 0
 
