@@ -4,6 +4,7 @@ from queue import Queue
 
 import cv2
 import numpy as np
+import torch
 
 import torch
 import torch.multiprocessing as mp
@@ -19,6 +20,9 @@ class WebCamDetectionLoader():
         stream = cv2.VideoCapture(int(input_source))
         assert stream.isOpened(), 'Cannot capture source'
         self.path = input_source
+        # Force Metal backend for OpenCV on Apple Silicon
+        if torch.backends.mps.is_available():
+            stream.set(cv2.CAP_PROP_BACKEND, cv2.CAP_MSMF)
         self.fourcc = int(stream.get(cv2.CAP_PROP_FOURCC))
         self.fps = stream.get(cv2.CAP_PROP_FPS)
         self.frameSize = (int(stream.get(cv2.CAP_PROP_FRAME_WIDTH)), int(stream.get(cv2.CAP_PROP_FRAME_HEIGHT)))

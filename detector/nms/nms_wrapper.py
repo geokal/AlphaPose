@@ -12,6 +12,7 @@ except ImportError:
 try:
     from . import nms_cuda
     NMS_CUDA_AVAILABLE = True
+    import torchvision.ops
 except ImportError:
     NMS_CUDA_AVAILABLE = False
     print("Warning: nms_cuda extension not available")
@@ -56,10 +57,15 @@ def nms(dets, iou_thr, device_id=None):
         if dets_th.device.type == 'mps' or dets_th.device.type == 'cpu':
             # Force soft-NMS on Apple Silicon (MPS) and CPU
             return soft_nms(dets, iou_thr)
-        elif dets_th.is_cuda:
-            if NMS_CUDA_AVAILABLE:
+        elif dets_th.is_cuda or dets_th.device.type == 'mps':
+            if NMS_CUDA_AVAILABLE and dets_th.is_cuda:
                 inds = nms_cuda.nms(dets_th, iou_thr)
             else:
+                # Fallback to torchvision.ops.nms for MPS/cpu
+                boxes_cpu = dets_th.cpu()
+                scores = boxes_cpu[:, 4]
+                keep = torchvision.ops.nms(boxes_cpu[:, :4], scores, iou_thr)
+                inds = keep.to(dets_th.device)
                 raise RuntimeError("CUDA NMS not available")
         else:
             raise RuntimeError("Unsupported device type for NMS")

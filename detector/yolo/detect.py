@@ -27,9 +27,14 @@ if __name__ == '__main__':
     nms_thesh = 0.4
 
     if torch.backends.mps.is_available():
-        CUDA = False
+        device = 'mps'
+        CUDA = False  # CUDA is not available on Apple Silicon
+    elif torch.cuda.is_available():
+        device = 'cuda'
+        CUDA = True
     else:
-        CUDA = torch.cuda.is_available()
+        device = 'cpu'
+        CUDA = False
 
     num_classes = 80
     classes = load_classes('data/coco.names') 
@@ -45,9 +50,8 @@ if __name__ == '__main__':
     assert inp_dim % 32 == 0
     assert inp_dim > 32
 
-    #If there's a GPU availible, put the model on GPU
-    if CUDA:
-        model.to('mps' if torch.backends.mps.is_available() else 'cuda')
+    # Move model to determined device (MPS > CUDA > CPU)
+    model.to(device)
 
     #Set the model in evaluation mode
     model.eval()
@@ -72,22 +76,18 @@ if __name__ == '__main__':
 
     for batch in im_batches:
         #load the image
-        if CUDA:
-            if torch.backends.mps.is_available():
-                batch = batch.to('mps')
-            else:
-                batch = batch.to('cuda')
+        # Move batch to same device as model
+        batch = batch.to(device)
         with torch.no_grad():
             prediction = model(Variable(batch), CUDA)
 
         prediction = write_results(prediction, confidence, num_classes, nms=True, nms_conf=nms_thesh)
         output = prediction
 
-        if CUDA:
-            if torch.backends.mps.is_available():
-                torch.mps.synchronize()
-            else:
-                torch.cuda.synchronize()
+        if device == 'mps':
+            torch.mps.synchronize()
+        elif device == 'cuda':
+            torch.cuda.synchronize()
 
     try:
         output
