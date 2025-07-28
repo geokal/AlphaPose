@@ -21,8 +21,8 @@ def get_test_input(input_dim, CUDA):
     img_ = torch.from_numpy(img_).float()
     img_ = Variable(img_)
     
-    if CUDA:
-        img_ = img_.cuda()
+    if device == 'cuda':
+        img_ = img_.to(device)
     
     return img_
 
@@ -73,9 +73,14 @@ if __name__ == '__main__':
     start = 0
 
     if torch.backends.mps.is_available():
-        CUDA = False
+        device = 'mps'
+        CUDA = False  # CUDA is not available on Apple Silicon
+    elif torch.cuda.is_available():
+        device = 'cuda'
+        CUDA = True
     else:
-        CUDA = torch.cuda.is_available()
+        device = 'cpu'
+        CUDA = False
 
     num_classes = 80
     bbox_attrs = 5 + num_classes
@@ -109,13 +114,9 @@ if __name__ == '__main__':
             img, orig_im, dim = prep_image(frame, inp_dim)
             im_dim = torch.FloatTensor(dim).repeat(1, 2)
             
-            if CUDA:
-                if torch.backends.mps.is_available():
-                    im_dim = im_dim.to('mps')
-                    img = img.to('mps')
-                else:
-                    im_dim = im_dim.cuda()
-                    img = img.cuda()
+            # Move batch to same device as model
+            im_dim = im_dim.to(device)
+            img = img.to(device)
             
             with torch.no_grad():   
                 output = model(Variable(img), CUDA)

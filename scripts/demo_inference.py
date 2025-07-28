@@ -59,9 +59,9 @@ parser.add_argument('--format', type=str,
                     help='save in the format of cmu or coco or openpose, option: coco/cmu/open')
 parser.add_argument('--min_box_area', type=int, default=0,
                     help='min box area to filter out')
-parser.add_argument('--detbatch', type=int, default=5,
+parser.add_argument('--detbatch', type=int, default=1,
                     help='detection batch size PER GPU')
-parser.add_argument('--posebatch', type=int, default=64,
+parser.add_argument('--posebatch', type=int, default=8,
                     help='pose estimation maximum batch size PER GPU')
 parser.add_argument('--eval', dest='eval', default=False, action='store_true',
                     help='save the result json as coco format, using image index(int) instead of image name(str)')
@@ -87,7 +87,9 @@ parser.add_argument('--pose_flow', dest='pose_flow',
                     help='track humans in video with PoseFlow', action='store_true', default=False)
 parser.add_argument('--pose_track', dest='pose_track',
                     help='track humans in video with reid', action='store_true', default=False)
-
+# Add device argument to parser
+parser.add_argument('--device', type=str, dest='device', default="auto",
+                    help='Specify device (cpu, cuda, mps) or auto-detect')
 
 import multiprocessing as mp
 mp.set_start_method('fork', force=True)
@@ -103,9 +105,15 @@ if torch.cuda.is_available():
     args.gpus = [int(i) for i in args.gpus.split(',')] if torch.cuda.device_count() >= 1 else [-1]
     args.device = torch.device("cuda:" + str(args.gpus[0]) if args.gpus[0] >= 0 else "cpu")
 elif torch.backends.mps.is_available():
-    args.gpus = [-1]  # MPS doesn't use GPU indices like CUDA
+    args.gpus = [-1]
     args.device = torch.device("mps")
     print("Using Apple Silicon MPS (Metal Performance Shaders) for acceleration")
+    # Disable CUDA-specific warnings on MPS
+    import warnings
+    warnings.filterwarnings("ignore", category=UserWarning, message="roi_align_cuda not available")
+    warnings.filterwarnings("ignore", category=UserWarning, message="nms_cpu extension not available")
+    warnings.filterwarnings("ignore", category=UserWarning, message="nms_cuda extension not available")
+    os.environ['PYTORCH_CUDA_ALLOCATOR'] = '0'
 else:
     args.gpus = [-1]
     args.device = torch.device("cpu")
@@ -312,4 +320,3 @@ if __name__ == "__main__":
             writer.terminate()
             writer.clear_queues()
             det_loader.clear_queues()
-
