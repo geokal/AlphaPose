@@ -15,9 +15,9 @@ import natsort
 
 from detector.apis import get_detector
 # Tracker imports disabled due to cython_bbox compatibility issues
-# from trackers.tracker_api import Tracker
-# from trackers.tracker_cfg import cfg as tcfg
-# from trackers import track
+from trackers.tracker_api import Tracker
+from trackers.tracker_cfg import cfg as tcfg
+from trackers import track
 from alphapose.models import builder
 from alphapose.utils.config import update_config
 from alphapose.utils.detector import DetectionLoader
@@ -87,6 +87,10 @@ parser.add_argument('--pose_flow', dest='pose_flow',
                     help='track humans in video with PoseFlow', action='store_true', default=False)
 parser.add_argument('--pose_track', dest='pose_track',
                     help='track humans in video with reid', action='store_true', default=False)
+
+
+import multiprocessing as mp
+mp.set_start_method('fork', force=True)
 
 args = parser.parse_args()
 cfg = update_config(args.cfg)
